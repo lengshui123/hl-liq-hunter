@@ -1,0 +1,65 @@
+{
+  "marginSummary": {
+    "accountValue": "41443.230581",
+    "totalNtlPos": "156870.174949",
+    "totalRawUsd": "-12463.998068",
+    "totalMarginUsed": "52290.058316"
+  },
+  "crossMarginSummary": {
+    "accountValue": "41443.230581",
+    "totalNtlPos": "156870.174949",
+    "totalRawUsd": "-12463.998068",
+    "totalMarginUsed": "52290.058316"
+  },
+  "crossMaintenanceMarginUsed": "26145.029158",
+  "withdrawable": "0.0",
+  "assetPositions": [
+    {
+      "type": "oneWay",
+      "position": {
+        "coin": "VVV",
+        "szi": "-3103.35",
+        "leverage": {
+          "type": "cross",
+          "value": 3
+        },
+        "entryPx": "5.2049",
+        "positionValue": "51481.47315",
+        "unrealizedPnl": "-35328.846735",
+        "returnOnEquity": "-6.561566985",
+        "liquidationPx": "45.0648775217",
+        "marginUsed": "17160.49105",
+        "maxLeverage": 3,
+        "cumFunding": {
+          "allTime": "-317.348088",
+          "sinceOpen": "-317.348088",
+          "sinceChange": "-754.06448"
+        }
+      }
+    },
+    {
+      "type": "oneWay",
+      "position": {
+        "coin": "MEGA",
+        "szi": "1304687.0",
+        "leverage": {
+          "type": "cross",
+          "value": 3
+        },
+        "entryPx": "0.130469",
+        "positionValue": "105388.701799",
+        "unrealizedPnl": "-64832.544385",
+        "returnOnEquity": "-1.1426166681",
+        "liquidationPx": null,
+        "marginUsed": "35129.567266",
+        "maxLeverage": 3,
+        "cumFunding": {
+          "allTime": "-1586.51112",
+          "sinceOpen": "-1586.51112",
+          "sinceChange": "-32.022808"
+        }
+      }
+    }
+  ],
+  "time": 1779252328676
+}

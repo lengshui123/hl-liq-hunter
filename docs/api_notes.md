@@ -106,7 +106,10 @@ All requests share the same URL — endpoint is identified by the `"type"` field
 
 ---
 
-## clearinghouseState Response Schema (confirmed via Phase 1 smoke test, 2026-05-20)
+## clearinghouseState Response Schema (verified 200 addresses / 862 positions, 2026-05-20)
+
+> Type verification method: `type()` on each field in live API responses (not JSON visual inspection).
+> Source: `scripts/verify_schema_types.py`, output `output/schema_types_20260520_134309.md`.
 
 ```jsonc
 {
@@ -125,21 +128,43 @@ All requests share the same URL — endpoint is identified by the `"type"` field
       "type": "oneWay",           // outer wrapper field — observed value "oneWay"; may vary
       "position": {
         "coin":           "BTC",
-        "szi":            "0.5",          // signed size, string (negative = short)
-        "leverage":       {"type": "cross", "value": 25},  // type: "cross" | "isolated"
-        "entryPx":        "65000.0",      // string
-        "positionValue":  844640.0,       // NUMBER (not string — unlike allMids prices)
-        "unrealizedPnl":  "-1234.5",      // string
-        "returnOnEquity": -4.21,          // float
-        "liquidationPx":  1404.73,        // float OR null — see gotcha below
-        "marginUsed":     "...",
+        "szi":            "0.5",          // str (negative = short)
+        "leverage": {
+          "type":   "cross",              // str: "cross" | "isolated"
+          "value":  25,                   // int — THE ONLY NATIVE NUMBER in position fields
+          "rawUsd": "12345.67"            // str — ONLY present for isolated positions (~8% of positions)
+        },
+        "entryPx":        "65000.0",      // str
+        "positionValue":  "844640.0",     // str (CONFIRMED — NOT a float, despite appearances)
+        "unrealizedPnl":  "-1234.5",      // str
+        "returnOnEquity": "-4.21",        // str (CONFIRMED — NOT a float)
+        "liquidationPx":  "1404.73",      // str OR null — see gotcha below
+        "marginUsed":     "...",          // str
         "maxLeverage":    40,             // int
-        "cumFunding":     {...}
+        "cumFunding": {
+          "allTime":      "...",          // str
+          "sinceOpen":    "...",          // str
+          "sinceChange":  "..."           // str
+        }
       }
     }
   ]
 }
 ```
+
+**Field type summary** (862 non-zero positions, 200 addresses, 2026-05-20):
+| Field | Type | Notes |
+|-------|------|-------|
+| `szi` | `str` | |
+| `entryPx` | `str` | |
+| `positionValue` | `str` | Previously mis-documented as float — CORRECTED |
+| `unrealizedPnl` | `str` | |
+| `returnOnEquity` | `str` | Previously mis-documented as float — CORRECTED |
+| `liquidationPx` | `str` \| `None` | `None` for ~44% of positions (cross, over-collateralised) |
+| `marginUsed` | `str` | |
+| `leverage.value` | `int` | **Only native numeric field** |
+| `leverage.rawUsd` | `str` | Present only for isolated positions (~8% of sample) |
+| `cumFunding.allTime` | `str` | |
 
 **leverage.type observed distribution** (2034 addresses, Phase 1 smoke test):
 - `"cross"`: 94% of positions
@@ -161,12 +186,12 @@ All requests share the same URL — endpoint is identified by the `"type"` field
 - 200+ perp symbols exist — never subscribe all on a single WS connection; shard by symbol group
 - `hash` field in trades can be all-zeros (`0x000...000`) for certain internal/system fills — do not use as unique key
 - Field names in WS messages may differ from REST responses — verify independently
-- **`liquidationPx` is null for ~42% of positions (5943-position sample, 2026-05-20). Root cause CONFIRMED via HL official docs.**
+- **`liquidationPx` is `str` when non-null, `None` when null** (confirmed via `type()` across 862 positions, 2026-05-20). Previously mis-documented as `float`. ~44% of positions are null.  Root cause CONFIRMED via HL official docs.**
   - 100% of null positions are cross-margin; isolated positions always have liq_px.
   - HL official formula: `liq_price = price − side × margin_available / position_size / (1 − l × side)` where `margin_available = account_value − maintenance_margin_required` for cross.
   - When a cross-margin account's `account_value` greatly exceeds `position_size`, the formula yields a negative (long) or astronomical (short) value — HL returns null rather than a meaningless number.
   - **Null positions are by definition "extremely safe" — their contribution to liquidation density is approximately zero.**
   - **Recommendation: skip all null entries. Do NOT attempt a formula-based fallback — it requires account-level `crossMarginSummary` fields and adds no signal for density mapping.**
   - Fields needed if account-level liq_px reconstruction is ever desired: `crossMarginSummary.accountValue`, `crossMaintenanceMarginUsed`, `position.szi` (signed size), `position.entryPx`.
-- **`positionValue` is a number (float), NOT a string** — unlike `allMids` prices which are strings. No `float()` conversion needed.
+- **`positionValue` is a string, NOT a float** — CORRECTED 2026-05-20. Earlier mis-observation came from a small smoke-test sample where values happened to be round numbers; JSON rendering of `"844640.0"` vs `844640.0` is visually similar. Type-verified via `type()` across 862 positions. Always apply `float()` conversion.
 - HL may apply sub-minute burst rate limits in addition to the rolling 60s window. Observed: 21 × 429s in 10-min smoke test at concurrency=15 even though rolling-window budget (1000/min) was not exceeded by total weight. Phase 2 baseline: concurrency=8, max_per_min=850.

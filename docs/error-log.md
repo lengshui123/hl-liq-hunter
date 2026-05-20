@@ -15,6 +15,15 @@
 | **Fix** | What resolved it, or "open" if unresolved |
 -->
 
+## 2026-05-20 — clearinghouseState 数值字段类型误判 (positionValue / liquidationPx / returnOnEquity)
+
+| Field | Detail |
+|-------|--------|
+| **Symptom** | `api_notes.md` 早期版本记录 `positionValue` 为 `float`（非 string），`returnOnEquity` 为 `float`，`liquidationPx` 非 null 时为 `float`。Phase 2 parser fixtures 据此把 `liquidationPx` 写成 JSON number（无引号），与真实 API 类型不符。 |
+| **Root cause** | 早期观察来自小样本 smoke test（5–10 个仓位）。这些仓位的 `positionValue` 恰好都是整数边界值（如 `844640.0`），JSON 文件里的 `"844640.0"`（带引号）与 `844640.0`（无引号）视觉上相似，直接看 JSON 形态而非用 `type()` 检查导致误判。`liquidationPx` 同理——小样本里的 float 值被当成 native number 记录。 |
+| **Fix** | 用 `scripts/verify_schema_types.py` 对 200 地址 / 862 仓位执行 `type()` 精确检验（2026-05-20）。结论：所有数值字段（`szi`, `entryPx`, `positionValue`, `unrealizedPnl`, `returnOnEquity`, `liquidationPx`, `marginUsed`, `cumFunding.allTime`）一致为 `str`；`leverage.value` 是唯一的 native `int`；`leverage.rawUsd` 是 `str`，仅 isolated 仓位有（~8%）。已修正 `api_notes.md` schema 表格、3 个 test fixtures（`liquidationPx` 改为带引号 string），parser 本身逻辑无误（`float()` 接受 str 输入）。 |
+| **Lesson** | 小样本 schema 验证不可靠。数值字段的 JSON 表示（有/无引号）可能因值的形态（整数、小数位数）而混淆视觉判断。必须用 `type()` 而非看 JSON 形态来确认 Python 类型。 |
+
 ## 2026-05-20 — Phase 1→2: 429 根因确认 + Phase 2 配置最终决定
 
 | Field | Detail |
