@@ -161,6 +161,12 @@ All requests share the same URL — endpoint is identified by the `"type"` field
 - 200+ perp symbols exist — never subscribe all on a single WS connection; shard by symbol group
 - `hash` field in trades can be all-zeros (`0x000...000`) for certain internal/system fills — do not use as unique key
 - Field names in WS messages may differ from REST responses — verify independently
-- **`liquidationPx` can be null — 42% of positions in smoke test (2026-05-20).** Root cause unknown; candidates: position too small / margin fully covers range / HL-internal logic. Do NOT assume "cross margin = null"; cross margin is 94% of positions but null rate is only 42% — the two do not align. Phase 2: skip null, log rate. Phase 4: decide whether to implement fallback formula.
+- **`liquidationPx` is null for ~42% of positions (5943-position sample, 2026-05-20). Root cause CONFIRMED via HL official docs.**
+  - 100% of null positions are cross-margin; isolated positions always have liq_px.
+  - HL official formula: `liq_price = price − side × margin_available / position_size / (1 − l × side)` where `margin_available = account_value − maintenance_margin_required` for cross.
+  - When a cross-margin account's `account_value` greatly exceeds `position_size`, the formula yields a negative (long) or astronomical (short) value — HL returns null rather than a meaningless number.
+  - **Null positions are by definition "extremely safe" — their contribution to liquidation density is approximately zero.**
+  - **Recommendation: skip all null entries. Do NOT attempt a formula-based fallback — it requires account-level `crossMarginSummary` fields and adds no signal for density mapping.**
+  - Fields needed if account-level liq_px reconstruction is ever desired: `crossMarginSummary.accountValue`, `crossMaintenanceMarginUsed`, `position.szi` (signed size), `position.entryPx`.
 - **`positionValue` is a number (float), NOT a string** — unlike `allMids` prices which are strings. No `float()` conversion needed.
 - HL may apply sub-minute burst rate limits in addition to the rolling 60s window. Observed: 21 × 429s in 10-min smoke test at concurrency=15 even though rolling-window budget (1000/min) was not exceeded by total weight. Phase 2 baseline: concurrency=8, max_per_min=850.

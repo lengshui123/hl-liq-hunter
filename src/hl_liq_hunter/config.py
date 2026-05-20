@@ -114,6 +114,17 @@ PHASE2_SCANNER_CONCURRENCY: int = 8
 PHASE2_INTER_BATCH_SLEEP_SEC: float = 1.0
 
 # liquidationPx handling: skip null entries, log the null rate each pass.
-# 42% of positions returned null in smoke test; root cause unconfirmed.
-# Do not implement fallback formula until Phase 4 confirms it is necessary.
+# Root cause confirmed (2026-05-20): cross-margin accounts with
+# account_value >> position_size produce liq_price < 0 or >> entry per the
+# HL formula (liq = price - side * margin_available / sz / (1 - l*side)).
+# Null positions are by definition nearly-impossible-to-liquidate; their
+# contribution to the density map is ≈ 0.  Skipping them loses no signal.
 PHASE2_SKIP_NULL_LIQ_PX: bool = True
+
+# TODO (Phase 4 optional sanity check only — NOT required for density map):
+# Phase 2 collector should also save these account-level fields from
+# clearinghouseState if needed for liq_px reconstruction verification:
+#   crossMarginSummary.accountValue
+#   crossMaintenanceMarginUsed
+#   position.szi  (signed size — needed to determine long/short for formula)
+# These are NOT used in Phase 2/3.  Record here so Phase 4 knows what to add.

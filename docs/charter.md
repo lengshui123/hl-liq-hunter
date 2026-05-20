@@ -63,6 +63,9 @@ not a random sample of all HL accounts. This is an intentional bias:
 > Baseline: `PHASE2_RATE_BUDGET=900`, `PHASE2_SCANNER_CONCURRENCY=8` per scanner,
 > `PHASE2_INTER_BATCH_SLEEP_SEC=1.0`.  Root cause of 429s: burst speed + post-429
 > sleep accumulation (H2+H3 combined).  See docs/error-log.md for full analysis.
+> `SKIP_NULL_LIQ_PX=True` validated as optimal choice (2026-05-20): null positions
+> are by definition "extremely safe" (account_value >> position_size in HL formula);
+> their contribution to density map ≈ 0.  No Phase 4 bias quantification needed.
 1. Build `core/ws_collector.py` to stream trades + liquidation events.
 2. Build `core/liq_density.py` to maintain a rolling density map.
 3. Store to `data/raw/` as minutely parquet batches.

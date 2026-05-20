@@ -41,14 +41,16 @@
 | **Implication** | Phase 2 scanner 不能假设每次查询约 100ms；在高负载下单次 acquire+request 可能阻塞数十秒。需分别记录 "acquire wait time" 和 "network RTT" 两个指标，以便区分配额瓶颈与网络问题 |
 | **Fix** | Phase 2 HLClient 在 `_post` 中分别计时 acquire 和 HTTP，各自记录到 log debug |
 
-## 2026-05-20 — Phase 1→2 smoke test: liquidationPx=null 比例 42% 语义未确认
+## 2026-05-20 — liquidationPx=null 根因 FINAL (v3)
 
 | Field | Detail |
 |-------|--------|
-| **Symptom** | smoke test 中 42% 的仓位 `liquidationPx` 字段为 null；最初推断为"cross margin 没单仓位清算价" |
-| **Root cause** | 推断不成立——实测中 cross margin 占 94%，如果 cross margin 全部 null，比例应远高于 42%；实际原因未知，候选：(a) 仓位规模过小、保证金极充足，清算价在可见价格范围外；(b) HL 服务端对某些仓位类型不计算清算价；(c) cross margin 部分仓位有清算价而其他没有，取决于账户整体保证金率。HL 官方文档未明确说明 |
-| **Implication** | 清算密度图可能少计 42% 的市场仓位；若这些仓位实际有清算价而我们未使用，会低估密度。但由于语义不明，无法安全地用 entry × leverage 公式回填 |
-| **Fix** | Phase 2 暂时跳过 `liquidationPx=null` 的仓位，在日志中记录 null 比例；Phase 4 决定是否实现 fallback 计算。禁止在语义未确认前使用公式回填 |
+| **Symptom** | clearinghouseState 返回的 `liquidationPx` 约 42% 为 null（5943 仓位样本；100% 的 null 是 cross-margin，isolated null = 0%） |
+| **v1 hypothesis** | REJECTED — "null = cross + small size"：v1 数据显示 cross ≥$10k 仓位仍有 30.7% null，size 不是充分解释 |
+| **v2 hypothesis** | REJECTED（方法有误）— "HL 黑盒服务端策略"：v2 的 H_B 测试用了错误简化公式（entry × leverage），没有代入包含 `margin_available` 的真实公式，导致错误判定 |
+| **v3 root cause (CONFIRMED)** | HL 官方文档（hyperliquid.gitbook.io/hyperliquid-docs/trading/liquidations）给出精确公式：`liq_price = price − side × margin_available / position_size / (1 − l × side)`，其中 cross: `margin_available = account_value − maintenance_margin_required`。当 cross 账户 `account_value` 远超 `position_size` 时，公式算出的 `liq_price` 为负数（long）或天文数字（short），HL 返回 null。这完美解释：isolated 100% 非 null（isolated_margin 有限，不会过剩）；cross 各 size bucket 均有 null（不是 size，是 account_value/position_size 比率）；对冲账户 null 率 2×（净敞口小但账户余额大）；margin_used/size_usd 两组一致（该比率与真正的 account_value/position_size 无关） |
+| **Implication (POSITIVE)** | null 仓位本质上是"几乎不会被清算"的仓位，其对清算密度图的贡献接近零。`SKIP_NULL_LIQ_PX=True` 不仅是合理选择，**是最优选择**。真实"可被清算"仓位的覆盖率接近 100%（不是之前以为的 60%）。Phase 4 无需量化偏差，无需在 edge 报告中声明覆盖率限制 |
+| **Fix** | `PHASE2_SKIP_NULL_LIQ_PX=True`，记录每 pass 的 null 率即可，不需要补算公式 |
 
 ## 2026-05-20 — Phase 1: dirty TTL 远短于 LONGTAIL 扫描间隔的语义陷阱
 
