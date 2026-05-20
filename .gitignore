@@ -1,0 +1,53 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+dist/
+*.egg-info/
+.eggs/
+*.egg
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+# Type checkers
+.mypy_cache/
+.ruff_cache/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# macOS
+.DS_Store
+
+# Claude Code local settings
+.claude/
+
+# Environment
+.env
+
+# Data (potentially large / sensitive)
+data/
+*.parquet
+*.arrow
+*.feather
+
+# Notebooks output
+notebooks/.ipynb_checkpoints/
+
+# Experiment output (Phase 0 PNGs etc — ephemeral, not code assets)
+output/
