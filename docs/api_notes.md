@@ -106,6 +106,53 @@ All requests share the same URL — endpoint is identified by the `"type"` field
 
 ---
 
+## clearinghouseState Response Schema (confirmed via Phase 1 smoke test, 2026-05-20)
+
+```jsonc
+{
+  "marginSummary":              {...},
+  "crossMarginSummary": {
+    "accountValue":       "12345.67",   // string
+    "totalNtlPos":        "...",
+    "totalRawUsd":        "...",
+    "totalMarginUsed":    "..."
+  },
+  "crossMaintenanceMarginUsed": "...",
+  "withdrawable":               "...",
+  "time":                       1716200000000,  // unix ms, int
+  "assetPositions": [
+    {
+      "type": "oneWay",           // outer wrapper field — observed value "oneWay"; may vary
+      "position": {
+        "coin":           "BTC",
+        "szi":            "0.5",          // signed size, string (negative = short)
+        "leverage":       {"type": "cross", "value": 25},  // type: "cross" | "isolated"
+        "entryPx":        "65000.0",      // string
+        "positionValue":  844640.0,       // NUMBER (not string — unlike allMids prices)
+        "unrealizedPnl":  "-1234.5",      // string
+        "returnOnEquity": -4.21,          // float
+        "liquidationPx":  1404.73,        // float OR null — see gotcha below
+        "marginUsed":     "...",
+        "maxLeverage":    40,             // int
+        "cumFunding":     {...}
+      }
+    }
+  ]
+}
+```
+
+**leverage.type observed distribution** (2034 addresses, Phase 1 smoke test):
+- `"cross"`: 94% of positions
+- `"isolated"`: 6% of positions
+
+**assetPositions length distribution** (same sample):
+- 0 positions: 16.5% of accounts
+- 1 position:  47.4%
+- 2 positions:  9.3%
+- 3+ positions: 26.8%
+
+---
+
 ## Known Gotchas
 
 - `clearinghouseState` weight = **2** confirmed (1200/min hard limit → 600 req/min max for this endpoint alone; use batching with inter-batch sleep)
@@ -114,3 +161,6 @@ All requests share the same URL — endpoint is identified by the `"type"` field
 - 200+ perp symbols exist — never subscribe all on a single WS connection; shard by symbol group
 - `hash` field in trades can be all-zeros (`0x000...000`) for certain internal/system fills — do not use as unique key
 - Field names in WS messages may differ from REST responses — verify independently
+- **`liquidationPx` can be null — 42% of positions in smoke test (2026-05-20).** Root cause unknown; candidates: position too small / margin fully covers range / HL-internal logic. Do NOT assume "cross margin = null"; cross margin is 94% of positions but null rate is only 42% — the two do not align. Phase 2: skip null, log rate. Phase 4: decide whether to implement fallback formula.
+- **`positionValue` is a number (float), NOT a string** — unlike `allMids` prices which are strings. No `float()` conversion needed.
+- HL may apply sub-minute burst rate limits in addition to the rolling 60s window. Observed: 21 × 429s in 10-min smoke test at concurrency=15 even though rolling-window budget (1000/min) was not exceeded by total weight. Phase 2 baseline: concurrency=8, max_per_min=850.

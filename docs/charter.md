@@ -59,6 +59,10 @@ not a random sample of all HL accounts. This is an intentional bias:
 4. **Gate**: p ≥ 0.01 → hypothesis rejected, don't build live infra.
 
 ### Step 2 — Live Collector (only if Step 1 passes)
+> Rate-limit configuration validated via 5-config burst experiment (2026-05-20).
+> Baseline: `PHASE2_RATE_BUDGET=900`, `PHASE2_SCANNER_CONCURRENCY=8` per scanner,
+> `PHASE2_INTER_BATCH_SLEEP_SEC=1.0`.  Root cause of 429s: burst speed + post-429
+> sleep accumulation (H2+H3 combined).  See docs/error-log.md for full analysis.
 1. Build `core/ws_collector.py` to stream trades + liquidation events.
 2. Build `core/liq_density.py` to maintain a rolling density map.
 3. Store to `data/raw/` as minutely parquet batches.
@@ -85,5 +89,5 @@ analysis/edge_test.py   # live-data edge test (Step 3)
 
 ## Key Constraints
 - No live trading code until edge is confirmed.
-- Rate budget: 1000 weight/min (HL hard limit 1200).
+- Rate budget: **900 weight/min** for Phase 2 (HL hard limit 1200; see burst experiment).
 - Storage: parquet, batched per minute, never one file per event.

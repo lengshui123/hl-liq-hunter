@@ -79,3 +79,41 @@ SYMBOLS: list[str] = [
     "BTC", "ETH", "SOL", "HYPE", "BNB",
     "XRP", "DOGE", "ARB", "SUI", "AVAX",
 ]
+
+# ── Phase 2 scanner defaults ──────────────────────────────────────────────────
+# Calibrated from Phase 1 smoke test (2026-05-20) and quota burst experiment
+# (5 configs × 5 min, 2026-05-20).  See docs/error-log.md for root-cause
+# analysis of the 429 pattern.
+#
+# Key finding: 429s require TWO conditions to coincide —
+#   (1) burst rate > ~30 weight/s fills the 60-s budget in < 10s, AND
+#   (2) HLClient's 8-s post-429 sleep lets other coroutines keep consuming,
+#       causing a second wave of 429s (H2 chain effect).
+#
+# Phase 2 has 4 TierScanners sharing ONE QuotaManager; at concurrency=8 per
+# scanner that is ~32 concurrent coroutines — beyond what was tested (max=15).
+# The settings below are calibrated conservatively for that untested regime.
+
+# Rolling-window budget passed to QuotaManager.
+# 900 (not 1000) reserves 100 weight as headroom for dirty-burst spikes and
+# for the gap between client-side and server-side window boundaries.
+# Experiment data: D (700/15) and C (850/8) were both 429-free; 900 sits
+# above C's budget while leaving a 100-unit buffer.
+PHASE2_RATE_BUDGET: int = 900
+
+# Per-scanner asyncio.Semaphore limit.
+# 8 × 4 scanners ≈ 32 peak concurrent coroutines — validated clean in
+# experiment config C (850/8, 0×429).  Do not raise above 8 per scanner
+# without re-running the burst experiment with 4 concurrent scanner tasks.
+PHASE2_SCANNER_CONCURRENCY: int = 8
+
+# Sleep inserted after each batch of PHASE2_SCANNER_CONCURRENCY queries.
+# Adds a batch-level rate floor that QuotaManager (per-request level) cannot
+# provide alone.  1.0 s per batch of 8 queries = ~16 weight/s sustained rate,
+# well below any plausible sub-minute burst threshold.
+PHASE2_INTER_BATCH_SLEEP_SEC: float = 1.0
+
+# liquidationPx handling: skip null entries, log the null rate each pass.
+# 42% of positions returned null in smoke test; root cause unconfirmed.
+# Do not implement fallback formula until Phase 4 confirms it is necessary.
+PHASE2_SKIP_NULL_LIQ_PX: bool = True
