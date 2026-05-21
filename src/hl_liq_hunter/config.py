@@ -35,6 +35,17 @@ ENDPOINT_WEIGHTS: dict[str, int] = {
 # HL drops connections with > ~12 active subscriptions (observed Phase 0).
 WS_MAX_SUBS_PER_CONN: int = 10
 
+# Alias used by TradesListener — same physical limit, clearer name in context.
+WS_SYMBOLS_PER_CONNECTION: int = WS_MAX_SUBS_PER_CONN
+
+# Reconnect backoff (seconds).
+WS_RECONNECT_INITIAL_SEC: float = 1.0
+WS_RECONNECT_MAX_SEC:     float = 60.0
+WS_RECONNECT_MULTIPLIER:  float = 2.0
+
+# websockets library ping_interval (seconds).  Keeps NAT/proxy connections alive.
+WS_PING_INTERVAL_SEC: int = 30
+
 # ── Address tier system ───────────────────────────────────────────────────────
 
 class Tier(IntEnum):
